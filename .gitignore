@@ -1,0 +1,55 @@
+# ---- OCaml / dune ----
+_build/
+*.install
+*.compiled
+.merlin
+.dune/
+
+# Dune cache (some setups)
+_dune/
+.dune-cache/
+.dune-workspace.dev
+
+# OCaml tooling
+.ocamlformat
+.ocamlformat-ignore
+.opam-switch/
+.opam/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ---- Node / Tailwind ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# If you generate CSS as an artifact you can either commit it or ignore it.
+# If you want a pure-source repo, ignore generated output:
+static/app.css
+
+# ---- Local env / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Database files (if you use local SQLite) ----
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+
+# ---- Coverage / test artifacts ----
+_bisect/
+coverage/
+*.coverage
