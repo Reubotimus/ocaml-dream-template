@@ -1,0 +1,8 @@
+lib: [
+  "_build/install/default/lib/learning-app/META"
+  "_build/install/default/lib/learning-app/dune-package"
+  "_build/install/default/lib/learning-app/opam"
+]
+bin: [
+  "_build/install/default/bin/learning-app"
+]
