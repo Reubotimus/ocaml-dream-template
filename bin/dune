@@ -1,4 +1,4 @@
 (executable
  (public_name learning-app)
  (name main)
- (libraries learning_app))
+ (libraries dotenv learning_app))

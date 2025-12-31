@@ -10,6 +10,7 @@ let render ~title ~(body : string) =
     <link rel="stylesheet" href="/static/app.css" />
     <title>%s</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   </head>
   <body class="min-h-screen bg-slate-50 text-slate-900">
     <div class="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">

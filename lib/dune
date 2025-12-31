@@ -1,5 +1,5 @@
 (include_subdirs qualified)
 (library
  (name learning_app)
- (libraries dream dream-htmx lwt.unix)
- (preprocess (pps ppx_let)))
+ (libraries dream dream-htmx lwt.unix lwt cohttp-lwt-unix yojson ppx_yojson_conv_lib)
+ (preprocess (pps ppx_let ppx_yojson_conv)))
