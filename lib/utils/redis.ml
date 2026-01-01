@@ -1,82 +1,66 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
-
-
-let get_env name =
-        match Sys.getenv_opt name with
-        | Some v when String.trim v <> "" -> String.trim v
-        | _ -> failwith (Printf.sprintf "Unable to get env variable with key %s" name) 
-
-let redis_url = lazy (get_env "UPSTASH_REDIS_REST_URL")
-let redis_token = lazy (get_env "UPSTASH_REDIS_REST_TOKEN")
-
 let headers () =
         Cohttp.Header.of_list [
-                ("Authorization", Printf.sprintf "Bearer %s" (Lazy.force redis_token));
+                ("Authorization", Printf.sprintf "Bearer %s" (Env.redis_token ()));
                 ("content-type", "application/json")
         ]
 
 let ( let* ) = Lwt.bind
 
+type redis_string_response = { 
+        result: string option [@yojson.default None]; 
+        error: string option [@yojson.default None]
+} [@@deriving yojson]
 
-let http_get url headers =
-  let* (resp, body) =
-    Cohttp_lwt_unix.Client.get ~headers (Uri.of_string url)
-  in
-  let code = resp
-             |> Cohttp.Response.status
-             |> Cohttp.Code.code_of_status in
-  if Cohttp.Code.is_success code
-  then
-    let* b = Cohttp_lwt.Body.to_string body in
-    Lwt.return (Ok b)
-  else
-    Lwt.return (Error (
-      Cohttp.Code.reason_phrase_of_code code
-    ))
+type redis_int_response = { 
+        result: int; 
+        error: string option [@yojson.default None]
+} [@@deriving yojson]
 
-type redis_string_reponse = { result: string } [@@deriving yojson]
-type redis_int_response = { result: int } [@@deriving yojson]
-
+type redis_error =
+        | Http_error of string
+        | Json_parse_error of string
+        | Redis_error of string
+        | Unexpected_response of string
 
 let parse_json json record_constructor =
-        try 
-                let parsed =
-                       json |> Yojson.Safe.from_string |> record_constructor in
-                Some parsed
-        with Ppx_yojson_conv_lib.Yojson_conv.Of_yojson_error (exc, _) ->
-                let _ =
-                        print_endline (Printexc.to_string exc) in
-                None
+        try let parsed =
+                json |> Yojson.Safe.from_string |> record_constructor in Ok parsed
+        with 
+                | Yojson.Json_error msg -> Error msg
+                | Ppx_yojson_conv_lib.Yojson_conv.Of_yojson_error (msg, _) -> Error (Printexc.to_string msg)
 
-let setex session ttl_seconds user_id =
-        let url = Printf.sprintf "%s/setex/sess:%s/%d/%s" (Lazy.force redis_url) session ttl_seconds user_id
-        in let* resp = http_get url (headers ()) in 
+let setex key ttl_seconds value =
+        let url = Printf.sprintf "%s/setex/%s/%d/%s" (Env.redis_url ()) (Uri.pct_encode key) ttl_seconds (Uri.pct_encode value)
+        in let* resp = Http.http_get url (headers ()) in 
                 match resp with
-                | Error _ -> Lwt_result.fail ()
-                | Ok body -> 
-                        match parse_json body redis_string_reponse_of_yojson with
-                        | Some { result = "OK" } -> Lwt_result.return ()
-                        | _ -> Lwt_result.fail ()
+                | Error (_, msg) -> Lwt_result.fail (Http_error msg)
+                | Ok (_, body) -> 
+                        match parse_json body redis_string_response_of_yojson with
+                        | Ok { error = Some err_msg; _ } -> Lwt_result.fail (Redis_error err_msg)
+                        | Ok { result = Some "OK"; _ } -> Lwt_result.return ()
+                        | Ok _ -> Lwt_result.fail (Unexpected_response "Invalid upstash response, not ok but no error")
+                        | Error msg -> Lwt_result.fail (Json_parse_error msg)
 
-let get session =
-        let url = Printf.sprintf "%s/get/sess:%s" (Lazy.force redis_url) session
-        in let* resp = http_get url (headers ()) in 
+let get key =
+        let url = Printf.sprintf "%s/get/%s" (Env.redis_url ()) (Uri.pct_encode key)
+        in let* resp = Http.http_get url (headers ()) in 
                 match resp with
-                | Error _ -> Lwt_result.fail ()
-                | Ok body -> 
-                        match parse_json body redis_string_reponse_of_yojson with
-                        | Some { result } -> Lwt_result.return result
-                        | _ -> Lwt_result.fail ()
+                | Error (_, msg) -> Lwt_result.fail (Http_error msg)
+                | Ok (_, body) -> 
+                        match parse_json body redis_string_response_of_yojson with
+                        | Ok { error = Some err_msg; _ } -> Lwt_result.fail (Redis_error err_msg)
+                        | Ok { result; _ } -> Lwt_result.return result
+                        | Error msg -> Lwt_result.fail (Json_parse_error msg)
 
-let delete session =
-        let url = Printf.sprintf "%s/del/sess:%s" (Lazy.force redis_url) session
-        in let* resp = http_get url (headers ()) in 
+let delete key =
+        let url = Printf.sprintf "%s/del/%s" (Env.redis_url ()) (Uri.pct_encode key)
+        in let* resp = Http.http_get url (headers ()) in 
                 match resp with
-                | Error _ -> Lwt_result.fail ()
-                | Ok body -> 
+                | Error (_, msg) -> Lwt_result.fail (Http_error msg)
+                | Ok (_, body) -> 
                         match parse_json body redis_int_response_of_yojson with
-                        | Some { result } -> Lwt_result.return result
-                        | _ -> Lwt_result.fail ()
-
-
+                        | Ok { error = Some err_msg; _ } -> Lwt_result.fail (Redis_error err_msg)
+                        | Ok { result; _ } -> Lwt_result.return result
+                        | Error msg -> Lwt_result.fail (Json_parse_error msg)
 

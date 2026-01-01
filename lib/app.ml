@@ -4,5 +4,6 @@ let handler =
        [
          Routes.Health.routes;
          Routes.Pages.routes;
+         Routes.Redis.routes;
          [ Dream.get "/static/**" (Dream.static "static") ];
        ])
