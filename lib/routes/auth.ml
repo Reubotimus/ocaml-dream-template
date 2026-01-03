@@ -76,6 +76,6 @@ let handle_login req =
 
 let routes : Dream.route list =
   [
-    Dream.get "/" (fun _ -> Dream.html (Views.Pages.Home.render ()));
+    Dream.get "/" (fun _ -> Dream.html (Pages.render_home ()));
     Dream.post "/auth/login" handle_login;
   ]
