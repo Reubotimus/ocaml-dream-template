@@ -63,7 +63,7 @@ let handle_login req =
                 in
                 let* set_session_resp =
                   Utils.Session.set_session req dream_resp
-                    (Printf.sprintf {|{"user_id":%s}|} session_obj.user_id)
+                    (Printf.sprintf {|{"user_id":"%s"}|} session_obj.user_id)
                 in
                 match set_session_resp with
                 | Ok _ -> Lwt.return dream_resp
