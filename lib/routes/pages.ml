@@ -61,15 +61,22 @@ let render_protected () =
 
 let render_login req =
   let csrf_tag = Dream.csrf_tag req in
+  let redirect =
+    match Dream.query req "redirect" with
+    | Some path when String.length path > 0 && path.[0] = '/' -> path
+    | _ -> "/protected"
+  in
+  let safe_redirect = Dream.html_escape redirect in
   let body =
     render_template ~template:"pages/login.html"
-      ~vars:[ ("csrf_tag", csrf_tag) ]
+      ~vars:[ ("csrf_tag", csrf_tag); ("redirect", safe_redirect) ]
   in
   render_layout ~title:"Login" ~body
 
 let routes : Dream.route list =
   [
     Dream.get "/" (fun _ -> Dream.html (render_home ()));
-    Dream.get "/protected" (fun _ -> Dream.html (render_protected ()));
+    Dream.get "/protected"
+      (Middleware.requires_auth (fun _ -> Dream.html (render_protected ())));
     Dream.get "/login" (fun req -> Dream.html (render_login req));
   ]

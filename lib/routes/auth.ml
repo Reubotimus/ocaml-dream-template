@@ -18,6 +18,11 @@ let session_of_supabase_response (res : Utils.Auth.supabase_login_response) :
     Utils.Session.session_info =
   { user_id = res.user_id }
 
+let redirect_from_fields fields =
+  match List.assoc_opt "redirect" fields with
+  | Some path when String.length path > 0 && path.[0] = '/' -> path
+  | _ -> "/protected"
+
 let handle_login req =
   match is_htmx req with
   | false ->
@@ -48,12 +53,13 @@ let handle_login req =
             Dream.respond ~status:`Bad_Request
               (login_feedback "Email and password are required")
           else
+            let redirect = redirect_from_fields fields in
             let* resp = Utils.Auth.supabase_login email password in
             match resp with
             | Ok session_obj -> (
                 let* dream_resp =
                   Dream.empty `No_Content
-                    ~headers:[ ("HX-Redirect", "/protected") ]
+                    ~headers:[ ("HX-Redirect", redirect) ]
                 in
                 let* set_session_resp =
                   Utils.Session.set_session req dream_resp
