@@ -46,20 +46,52 @@ let render_template ~template ~vars =
       replace_all ~pattern ~with_:value acc)
     contents vars
 
-let render_layout ~title ~(body : string) =
+let render_layout ~title ~auth_link ~(body : string) =
   let safe_title = Dream.html_escape title in
   render_template ~template:"layouts/base.html"
-    ~vars:[ ("title", safe_title); ("body", body) ]
+    ~vars:[ ("title", safe_title); ("body", body); ("auth_link", auth_link) ]
 
-let render_home () =
-  let body = render_template ~template:"pages/home.html" ~vars:[] in
-  render_layout ~title:"Public page" ~body
+let logout_form ~form_class ~button_class ~label =
+  Printf.sprintf
+    "<form class=\"%s\" method=\"post\" action=\"/auth/logout\"><button \
+     class=\"%s\" type=\"submit\">%s</button></form>"
+    form_class button_class label
 
-let render_protected () =
-  let body = render_template ~template:"pages/protected.html" ~vars:[] in
-  render_layout ~title:"Protected page" ~body
+let auth_link logged_in =
+  if logged_in then
+    logout_form ~form_class:"inline"
+      ~button_class:"rounded-lg px-3 py-2 transition hover:bg-slate-100"
+      ~label:"Log out"
+  else
+    "<a class=\"rounded-lg px-3 py-2 transition hover:bg-slate-100\" \
+     href=\"/login\">Login</a>"
 
-let render_login req =
+let auth_action logged_in =
+  if logged_in then
+    logout_form ~form_class:"inline"
+      ~button_class:
+        "rounded-xl bg-slate-900 px-4 py-2 text-white shadow-sm \
+         hover:bg-slate-800"
+      ~label:"Log out"
+  else
+    "<a class=\"rounded-xl bg-emerald-500 px-4 py-2 text-white shadow-sm \
+     hover:bg-emerald-600\" href=\"/login\">Visit the sign-in page</a>"
+
+let render_home ~auth_link ~auth_action =
+  let body =
+    render_template ~template:"pages/home.html"
+      ~vars:[ ("auth_action", auth_action) ]
+  in
+  render_layout ~title:"Public page" ~auth_link ~body
+
+let render_protected ~auth_link ~auth_action =
+  let body =
+    render_template ~template:"pages/protected.html"
+      ~vars:[ ("auth_action", auth_action) ]
+  in
+  render_layout ~title:"Protected page" ~auth_link ~body
+
+let render_login req ~auth_link =
   let csrf_tag = Dream.csrf_tag req in
   let redirect =
     match Dream.query req "redirect" with
@@ -71,12 +103,48 @@ let render_login req =
     render_template ~template:"pages/login.html"
       ~vars:[ ("csrf_tag", csrf_tag); ("redirect", safe_redirect) ]
   in
-  render_layout ~title:"Login" ~body
+  render_layout ~title:"Login" ~auth_link ~body
+
+let string_of_redis_error e =
+  match e with
+  | Utils.Redis.Http_error m -> Format.sprintf "Http_error: %s" m
+  | Utils.Redis.Json_parse_error m -> Format.sprintf "Json_parse_error: %s" m
+  | Utils.Redis.Redis_error m -> Format.sprintf "Redis_error: %s" m
+  | Utils.Redis.Unexpected_response m ->
+      Format.sprintf "Unexpected_response: %s" m
+
+let logged_in_from_req req =
+  let ( let* ) = Lwt.bind in
+  let* session_result = Utils.Session.get_session req in
+  match session_result with
+  | Ok (Some _) -> Lwt.return true
+  | Ok None -> Lwt.return false
+  | Error err ->
+      Dream.log "Unable to read session for auth link: %s"
+        (string_of_redis_error err);
+      Lwt.return false
 
 let routes : Dream.route list =
   [
-    Dream.get "/" (fun _ -> Dream.html (render_home ()));
+    Dream.get "/" (fun req ->
+        let ( let* ) = Lwt.bind in
+        let* logged_in = logged_in_from_req req in
+        Dream.html
+          (render_home ~auth_link:(auth_link logged_in)
+             ~auth_action:(auth_action logged_in)));
     Dream.get "/protected"
-      (Middleware.requires_auth (fun _ -> Dream.html (render_protected ())));
-    Dream.get "/login" (fun req -> Dream.html (render_login req));
+      (Middleware.requires_auth (fun _ ->
+           Dream.html
+             (render_protected ~auth_link:(auth_link true)
+                ~auth_action:(auth_action true))));
+    Dream.get "/login" (fun req ->
+        let ( let* ) = Lwt.bind in
+        let* session_result = Utils.Session.get_session req in
+        match session_result with
+        | Ok (Some _) -> Dream.redirect req "/protected"
+        | Ok None -> Dream.html (render_login req ~auth_link:(auth_link false))
+        | Error err ->
+            Dream.log "Unable to read session for login page: %s"
+              (string_of_redis_error err);
+            Dream.html (render_login req ~auth_link:(auth_link false)));
   ]

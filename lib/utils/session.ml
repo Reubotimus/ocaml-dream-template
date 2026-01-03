@@ -39,23 +39,23 @@ let set_session req resp session_obj =
       | Error e -> Lwt_result.fail e
       | Ok _ -> Lwt_result.return (Dream.set_cookie resp req "session" session))
 
-let is_error r = match r with Error _ -> true | Ok _ -> false
+type delete_outcome =
+  [ `No_session | `Deleted | `Redis_error of Redis.redis_error ]
 
-let delete_session req resp =
+let delete_session req resp_builder =
+  let ( let* ) = Lwt.bind in
   match Dream.cookie req "session" with
-  | None -> Lwt_result.return ()
-  | Some session_info_string -> (
-      match parse_session session_info_string with
-      | None ->
-          Lwt_result.fail (Redis.Unexpected_response "failed to parse_session")
-      | Some obj ->
-          let* redis_resp =
-            Redis.delete (Printf.sprintf "sess:%s" obj.user_id)
-          in
-          if is_error redis_resp then
-            Dream.log "Unable to delete session from redis";
-          Dream.drop_cookie resp req "session";
-          Lwt_result.return ())
+  | None ->
+      let* resp = resp_builder `No_session in
+      Lwt.return resp
+  | Some token ->
+      let* redis_resp = Redis.delete (Printf.sprintf "sess:%s" token) in
+      let outcome =
+        match redis_resp with Ok _ -> `Deleted | Error err -> `Redis_error err
+      in
+      let* resp = resp_builder outcome in
+      Dream.drop_cookie resp req "session";
+      Lwt.return resp
 
 let get_session req =
   match Dream.cookie req "session" with

@@ -14,6 +14,14 @@ let string_of_supabase_error e =
   | Response_parse_error m -> Format.sprintf "Response_parse_error: %s" m
   | Unexpected_error m -> Format.sprintf "Unexpected_error: %s" m
 
+let string_of_redis_error e =
+  match e with
+  | Utils.Redis.Http_error m -> Format.sprintf "Http_error: %s" m
+  | Utils.Redis.Json_parse_error m -> Format.sprintf "Json_parse_error: %s" m
+  | Utils.Redis.Redis_error m -> Format.sprintf "Redis_error: %s" m
+  | Utils.Redis.Unexpected_response m ->
+      Format.sprintf "Unexpected_response: %s" m
+
 let session_of_supabase_response (res : Utils.Auth.supabase_login_response) :
     Utils.Session.session_info =
   { user_id = res.user_id }
@@ -58,8 +66,7 @@ let handle_login req =
             match resp with
             | Ok session_obj -> (
                 let* dream_resp =
-                  Dream.empty `No_Content
-                    ~headers:[ ("HX-Redirect", redirect) ]
+                  Dream.empty `No_Content ~headers:[ ("HX-Redirect", redirect) ]
                 in
                 let* set_session_resp =
                   Utils.Session.set_session req dream_resp
@@ -80,8 +87,27 @@ let handle_login req =
                 Dream.respond ~status:`Bad_Gateway
                   (login_feedback "Please try again or contact support")))
 
+let handle_logout req =
+  let resp_builder outcome =
+    match outcome with
+    | `No_session ->
+        Dream.respond ~status:`Unauthorized
+          (login_feedback "You are already logged out")
+    | `Deleted -> Dream.redirect ~status:`See_Other req "/login"
+    | `Redis_error err ->
+        Dream.log "Failed to delete session during logout: %s"
+          (string_of_redis_error err);
+        Dream.respond ~status:`Bad_Gateway
+          (login_feedback "Unable to log out right now")
+  in
+  Utils.Session.delete_session req resp_builder
+
 let routes : Dream.route list =
   [
-    Dream.get "/" (fun _ -> Dream.html (Pages.render_home ()));
+    Dream.get "/" (fun _ ->
+        Dream.html
+          (Pages.render_home ~auth_link:(Pages.auth_link false)
+             ~auth_action:(Pages.auth_action false)));
     Dream.post "/auth/login" handle_login;
+    Dream.post "/auth/logout" handle_logout;
   ]
