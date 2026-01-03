@@ -3,3 +3,8 @@
 @source "../bin/**/*.ml";
 
 @import "tailwindcss";
+
+#login-form.htmx-request #login-submit {
+    opacity: 0.6;
+    pointer-events: none;
+}

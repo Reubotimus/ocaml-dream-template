@@ -13,11 +13,10 @@ let routes : Dream.route list =
         let ttl_str = Dream.param request "ttl" in
         let value = Dream.param request "value" in
         match int_of_string_opt ttl_str with
-        | None ->
-            Dream.respond ~status:`Bad_Request "ttl must be an int"
-        | Some ttl ->
+        | None -> Dream.respond ~status:`Bad_Request "ttl must be an int"
+        | Some ttl -> (
             let* result = Utils.Redis.setex key ttl value in
-            (match result with
+            match result with
             | Ok () -> Dream.respond "ok"
             | Error err ->
                 Dream.respond ~status:`Internal_Server_Error

@@ -1,5 +1,5 @@
-let render () =
-  let login_form = Fragments.Auth.Login_form.render () in
+let render req =
+  let login_form = Fragments.Auth.Login_form.render req in
   Layout.Base.render ~title:"Login"
     ~body:
       (Printf.sprintf
