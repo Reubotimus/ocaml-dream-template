@@ -1,15 +1,12 @@
 let ( let* ) = Lwt.bind
 
-let is_htmx req =
-  match Dream.header req "HX-Request" with Some "true" -> true | _ -> false
-
 let login_feedback msg =
   Printf.sprintf "<p class=\"text-sm text-red-600\">%s</p>"
     (Dream.html_escape msg)
 
 let string_of_supabase_error e =
   match e with
-  | Utils.Auth.Http_error m -> Format.sprintf "Http_error: %s" m
+  | Utils.Supabase.Http_error m -> Format.sprintf "Http_error: %s" m
   | Unauthorised m -> Format.sprintf "Unauthorised: %s" m
   | Response_parse_error m -> Format.sprintf "Response_parse_error: %s" m
   | Unexpected_error m -> Format.sprintf "Unexpected_error: %s" m
@@ -22,17 +19,13 @@ let string_of_redis_error e =
   | Utils.Redis.Unexpected_response m ->
       Format.sprintf "Unexpected_response: %s" m
 
-let session_of_supabase_response (res : Utils.Auth.supabase_login_response) :
-    Utils.Session.session_info =
-  { user_id = res.user_id }
-
 let redirect_from_fields fields =
   match List.assoc_opt "redirect" fields with
   | Some path when String.length path > 0 && path.[0] = '/' -> path
   | _ -> "/protected"
 
 let handle_login req =
-  match is_htmx req with
+  match Htmx.is_htmx req with
   | false ->
       Dream.respond ~status:`Bad_Request
         (login_feedback "make request through htmx")
@@ -62,7 +55,7 @@ let handle_login req =
               (login_feedback "Email and password are required")
           else
             let redirect = redirect_from_fields fields in
-            let* resp = Utils.Auth.supabase_login email password in
+            let* resp = Utils.Supabase.supabase_login email password in
             match resp with
             | Ok session_obj -> (
                 let* dream_resp =

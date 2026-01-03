@@ -19,6 +19,17 @@ let load template =
       Hashtbl.add cache template contents;
       contents
 
+let preload () =
+  let templates =
+    [
+      "layouts/base.html";
+      "pages/home.html";
+      "pages/protected.html";
+      "pages/login.html";
+    ]
+  in
+  List.iter (fun template -> ignore (load template)) templates
+
 let replace_all ~pattern ~with_ source =
   if pattern = "" then source
   else

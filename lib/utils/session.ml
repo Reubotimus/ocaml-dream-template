@@ -11,7 +11,7 @@ let session_token ?(bytes = 32) () =
 
 let rec create_unique_token () =
   let t = session_token () in
-  let* resp = Redis.get t in
+  let* resp = Redis.get (Printf.sprintf "sess:%s" t) in
   match resp with
   | Error e -> Lwt_result.fail e
   | Ok (Some _) -> create_unique_token ()
