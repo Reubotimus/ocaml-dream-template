@@ -24,6 +24,22 @@ let redirect_from_fields fields =
   | Some path when String.length path > 0 && path.[0] = '/' -> path
   | _ -> "/protected"
 
+let%expect_test "redirect_from_fields /ok" =
+  redirect_from_fields [ ("redirect", "/ok") ] |> print_endline;
+  [%expect {|/ok|}]
+
+let%expect_test "redirect_from_fields empty" =
+  redirect_from_fields [ ("redirect", "") ] |> print_endline;
+  [%expect {|/protected|}]
+
+let%expect_test "redirect_from_fields external url" =
+  redirect_from_fields [ ("redirect", "http://evil.com") ] |> print_endline;
+  [%expect {|/protected|}]
+
+let%expect_test "redirect_from_fields double slash" =
+  redirect_from_fields [ ("redirect", "//evil.com") ] |> print_endline;
+  [%expect {|//evil.com|}]
+
 let handle_login req =
   match Htmx.is_htmx req with
   | false ->

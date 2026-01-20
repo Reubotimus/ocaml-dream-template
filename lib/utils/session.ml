@@ -24,6 +24,15 @@ let parse_session session_text =
       Dream.log "Unable to parse session %s" msg;
       None
 
+let%expect_test "parse_session ok" =
+  let result =
+    match parse_session {|{"user_id":"u1"}|} with
+    | Some { user_id } -> user_id
+    | None -> "none"
+  in
+  print_endline result;
+  [%expect {|u1|}]
+
 let set_session req resp session_obj =
   let* token = create_unique_token () in
   match token with

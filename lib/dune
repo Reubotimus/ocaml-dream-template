@@ -10,6 +10,8 @@
   uri
   cohttp-lwt-unix
   yojson
-  ppx_yojson_conv_lib)
+  ppx_yojson_conv_lib
+  ppx_expect)
+ (inline_tests)
  (preprocess
-  (pps ppx_let ppx_yojson_conv)))
+  (pps ppx_let ppx_yojson_conv ppx_expect)))

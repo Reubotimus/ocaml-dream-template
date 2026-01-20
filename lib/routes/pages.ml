@@ -49,6 +49,26 @@ let replace_all ~pattern ~with_ source =
     loop 0;
     Buffer.contents buf
 
+let%expect_test "replace_all empty pattern" =
+  replace_all ~pattern:"" ~with_:"x" "abc" |> print_endline;
+  [%expect {|abc|}]
+
+let%expect_test "replace_all single match" =
+  replace_all ~pattern:"a" ~with_:"x" "a" |> print_endline;
+  [%expect {|x|}]
+
+let%expect_test "replace_all multiple matches" =
+  replace_all ~pattern:"ab" ~with_:"x" "ababa" |> print_endline;
+  [%expect {|xxa|}]
+
+let%expect_test "replace_all overlapping pattern" =
+  replace_all ~pattern:"aba" ~with_:"x" "ababa" |> print_endline;
+  [%expect {|xba|}]
+
+let%expect_test "replace_all pattern at end" =
+  replace_all ~pattern:"b" ~with_:"x" "ab" |> print_endline;
+  [%expect {|ax|}]
+
 let render_template ~template ~vars =
   let contents = load template in
   List.fold_left

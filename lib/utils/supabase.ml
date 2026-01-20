@@ -13,12 +13,52 @@ type supabase_error =
 type supabase_login_response = { user_id : string }
 
 let supabase_login_response_of_string string =
+  try
   let safe = Yojson.Safe.from_string string in
   match
     safe |> Yojson.Safe.Util.member "user" |> Yojson.Safe.Util.member "id"
   with
   | `Null -> None
   | v -> Some { user_id = Yojson.Safe.Util.to_string v }
+  with
+  | _ -> None
+
+let print_login_response response =
+  match response with
+  | Some { user_id } -> print_endline user_id
+  | None -> print_endline "none"
+
+let print_login_response_or_error json =
+  try
+    let response = supabase_login_response_of_string json in
+    print_login_response response
+  with
+  | _ -> print_endline "exn"
+
+let%expect_test "supabase_login_response user id" =
+  let json = {|{"user":{"id":"abc"}}|} in
+  print_login_response_or_error json;
+  [%expect {|abc|}]
+
+let%expect_test "supabase_login_response user object missing id" =
+  let json = {|{"user":{}}|} in
+  print_login_response_or_error json;
+  [%expect {|none|}]
+
+let%expect_test "supabase_login_response missing user" =
+  let json = {|{"no_user":true}|} in
+  print_login_response_or_error json;
+  [%expect {|none|}]
+
+let%expect_test "supabase_login_response null id" =
+  let json = {|{"user":{"id":null}}|} in
+  print_login_response_or_error json;
+  [%expect {|none|}]
+
+let%expect_test "supabase_login_response invalid json" =
+  let json = "{bad json" in
+  print_login_response_or_error json;
+  [%expect {|none|}]
 
 let supabase_login email password =
   let url =

@@ -28,3 +28,27 @@ let parse_json json record_constructor =
   | Yojson.Json_error msg -> Error msg
   | Ppx_yojson_conv_lib.Yojson_conv.Of_yojson_error (msg, _) ->
       Error (Printexc.to_string msg)
+
+let%expect_test "parse_json ok" =
+  let constructor json =
+    Yojson.Safe.Util.member "x" json |> Yojson.Safe.Util.to_int
+  in
+  let result =
+    match parse_json {|{"x":3}|} constructor with
+    | Ok v -> string_of_int v
+    | Error _ -> "error"
+  in
+  print_endline result;
+  [%expect {|3|}]
+
+let%expect_test "parse_json invalid" =
+  let constructor json =
+    Yojson.Safe.Util.member "x" json |> Yojson.Safe.Util.to_int
+  in
+  let result =
+    match parse_json "{bad json" constructor with
+    | Ok _ -> "ok"
+    | Error _ -> "error"
+  in
+  print_endline result;
+  [%expect {|error|}]
